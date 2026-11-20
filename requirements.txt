@@ -1,0 +1,5 @@
+flask
+pillow
+numpy
+tensorflow   # solo si vas a usar un modelo entrenado
+ultralytics

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hands With Voice · Lengua de Señas Colombiana</title>
+  <meta name="theme-color" content="#07060d">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-alphabet='{{ alphabet|tojson }}' data-available='{{ available|tojson }}'
+      data-img-url="{{ url_for('static', filename='alfabeto/') }}">
+
+  <header class="hero">
+    <div class="wrap hero-inner">
+      <div class="topbar">
+        <span class="brand"><i class="brand-dot"></i>Manos que hablan</span>
+        <span class="pill" id="statusPill"><i class="dot"></i><span id="statusText">Cámara apagada</span></span>
+      </div>
+      <p class="eyebrow">Lengua de Señas Colombiana · LSC</p>
+      <h1 class="hero-title">Tus manos tienen <span class="mark">voz</span></h1>
+      <p class="hero-sub">Muestra una seña a la cámara y léela como texto, o escribe una palabra y mira cómo se deletrea con las manos.</p>
+      <ul class="stats">
+        <li><b>{{ alphabet|length }}</b><span>letras del alfabeto</span></li>
+        <li><b>{{ available|length }}</b><span>con imagen de referencia</span></li>
+        <li><b>0</b><span>fotos guardadas</span></li>
+      </ul>
+    </div>
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        {% for _ in range(2) %}{% for f in available.values() %}<img src="{{ url_for('static', filename='alfabeto/' ~ f) }}" alt="">{% endfor %}{% endfor %}
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="tabs" role="tablist" aria-label="Modos de la aplicación">
+      <button class="tab is-active" role="tab" data-tab="sena" aria-selected="true"><span>01</span><b>Seña → Texto</b><small>Usa la cámara</small></button>
+      <button class="tab" role="tab" data-tab="texto" aria-selected="false" tabindex="-1"><span>02</span><b>Texto → Seña</b><small>Deletrea palabras</small></button>
+      <button class="tab" role="tab" data-tab="alfabeto" aria-selected="false" tabindex="-1"><span>03</span><b>Alfabeto</b><small>Guía de referencia</small></button>
+    </nav>
+
+    <div class="alert" id="alert" role="alert" hidden></div>
+
+    <!-- Seña → Texto -->
+    <section class="panel is-active" id="tab-sena" role="tabpanel">
+      {% if demo %}<div class="notice"><strong>Modo demostración.</strong> No hay un modelo entrenado: la cámara funciona, pero no se reconocen letras. Guarda tu modelo en <code>model/</code> y reinicia la app.</div>{% endif %}
+      <div class="workspace">
+        <article class="card">
+          <header class="card-head"><span class="step">1</span><div><h2>Muestra tu seña</h2><p>Coloca la mano dentro del recuadro.</p></div></header>
+          <div class="video-wrap" id="videoWrap">
+            <video id="video" autoplay playsinline muted aria-label="Vista previa de la cámara"></video>
+            <div class="guide" aria-hidden="true"></div>
+            <p class="placeholder">Activa la cámara para empezar</p>
+            <div class="detected" id="detected" hidden>
+              <span class="detected-letter" id="detectedLetter">–</span>
+              <div class="detected-meta"><small>Confianza</small><div class="bar"><div class="bar-fill" id="confBar"></div></div><b id="confText">0%</b></div>
+            </div>
+          </div>
+          <canvas id="canvas" hidden></canvas>
+          <button class="btn btn-primary btn-block" id="btnCamera">Activar cámara</button>
+        </article>
+
+        <article class="card">
+          <header class="card-head"><span class="step">2</span><div><h2>Lee el resultado</h2><p>Mantén la seña unos instantes para confirmarla.</p></div></header>
+          <div class="output" id="output" aria-live="polite"></div>
+          <div class="progress-wrap"><span>Confirmando letra</span><div class="progress"><div class="progress-fill" id="holdBar"></div></div></div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" id="btnSpace">Espacio</button>
+            <button class="btn btn-ghost" id="btnDelete">Borrar</button>
+            <button class="btn btn-ghost" id="btnClear">Limpiar</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btnSpeak">Leer en voz alta</button>
+            <button class="btn btn-ghost" id="btnCopy">Copiar</button>
+          </div>
+        </article>
+      </div>
+      <ul class="tips">
+        <li><b>Buena luz</b><p>Evita contraluces y sombras sobre la mano.</p></li>
+        <li><b>Fondo liso</b><p>Una pared clara ayuda al modelo a ver tus dedos.</p></li>
+        <li><b>Mantén la seña</b><p>Para repetir una letra (LL, RR) espera un poco más.</p></li>
+      </ul>
+    </section>
+
+    <!-- Texto → Seña -->
+    <section class="panel" id="tab-texto" role="tabpanel">
+      <article class="card">
+        <header class="card-head"><span class="step">✎</span><div><h2>Escribe y mira cómo se deletrea</h2><p>Cada letra se muestra con su seña en LSC.</p></div></header>
+        <label class="sr-only" for="textInput">Texto a deletrear</label>
+        <input class="text-input" id="textInput" type="text" maxlength="40" placeholder="Escribe una palabra, por ejemplo: HOLA" autocomplete="off">
+        <div class="sign-row" id="signRow"></div>
+        <p class="legend">Las letras G, J, S, Z y Ñ llevan movimiento: no pueden mostrarse como imagen fija y aparecen como fichas sin imagen.</p>
+      </article>
+    </section>
+
+    <!-- Alfabeto -->
+    <section class="panel" id="tab-alfabeto" role="tabpanel">
+      <article class="card">
+        <header class="card-head"><span class="step">Aa</span><div><h2>Alfabeto dactilológico</h2><p>Las {{ alphabet|length }} letras de la Lengua de Señas Colombiana.</p></div></header>
+        <div class="alpha-grid" id="alphaGrid"></div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Hecho con Python · Flask · TensorFlow — Proyecto de apoyo a la comunidad sorda.</p>
+    <p>Herramienta educativa: reconoce el alfabeto manual (deletreo), no la LSC completa. Las imágenes se procesan en tu equipo y no se almacenan.</p>
+  </footer>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
